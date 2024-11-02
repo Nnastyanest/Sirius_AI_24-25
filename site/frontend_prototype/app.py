@@ -16,54 +16,48 @@ def send_file_to_server(file):
 def main_page():
     """Главная страница для загрузки и обработки файлов"""
     st.title("Добавить конспект")
-    uploaded_files = st.file_uploader(
+    uploaded_file = st.file_uploader(
         "Загрузите текстовые, аудио или видео файлы",
-        type=["txt", "mp3", "wav", "mp4", "mkv"]
+        type=["txt", "mp3", "mp4"]
     )
 
-    if uploaded_files:
+    if uploaded_file:
         if st.button("Отправить на сервер"):
-            response = send_file_to_server(uploaded_files)
+            response = send_file_to_server(uploaded_file)
 
             if response.status_code == 200:
-                files_received = response.json().get("files", [])
+                file_name = '.'.join(str(uploaded_file.name).split('.')[:-1]) + '.tex'
+                file_content = BytesIO(response.content)
 
-                st.write("Полученные файлы:")
+                st.write(f"**Имя файла**: {file_name}")
+                st.download_button(
+                    label="Скачать документ LaTeX",
+                    data=file_content,
+                    file_name=file_name,
+                    mime="application/x-tex"
+                )
+                st.session_state['history'].append({
+                    "type": "received",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "name": file_name,
+                    "size": len(response.content),
+                    "content": response.content
+                })
 
-                for file_info in files_received:
-                    file_name = file_info["name"]
-                    file_extension = file_info["extension"]
-                    file_content = BytesIO(file_info["content"].encode('latin1'))
-
-                    st.write(f"**Имя файла**: {file_name}")
-                    st.write(f"**Расширение**: {file_extension}")
-                    st.download_button(
-                        label="Скачать",
-                        data=file_content,
-                        file_name=f"{file_name}.{file_extension}",
-                        mime="application/octet-stream"
-                    )
-
-                    st.session_state['history'].append({
-                        "type": "received",
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "name": f"{file_name}.{file_extension}",
-                        "size": len(file_content.getvalue()),
-                    })
             else:
-                st.error("Ошибка при обработке файлов на сервере")
+                st.error("Ошибка при обработке файла на сервере")
 
 
 def settings_page():
     """Раздел с настройками"""
     st.title("Настройки")
-    st.write("пумпурм")
+    st.write("В процессе реализации...")
 
 
 def wastebasket_page():
     """Раздел с настройками"""
     st.title("Корзина")
-    st.write("пумпурм")
+    st.write("В процессе реализации...")
 
 
 def history_page():
@@ -71,11 +65,25 @@ def history_page():
     st.title("История")
 
     if st.session_state['history']:
-        for entry in st.session_state['history']:
+        for idx, entry in enumerate(st.session_state['history']):
             st.write(f"**Время**: {entry['timestamp']}")
             st.write(f"**Тип**: {'Загружен' if entry['type'] == 'uploaded' else 'Получен'}")
             st.write(f"**Имя файла**: {entry['name']}")
-            st.write(f"**Размер файла**: {entry['size']} байт")
+
+            size_in_mb = entry['size'] / (1024)
+            st.write(f"**Размер файла**: {size_in_mb:.2f} Кб")
+
+            if 'content' in entry:
+                st.download_button(
+                    label="Скачать из истории",
+                    data=BytesIO(entry['content']),
+                    file_name=entry['name'],
+                    mime="application/x-tex",
+                    key=f"download_{idx}"
+                )
+            else:
+                st.write("Файл недоступен для загрузки.")
+            
             st.write("---")
     else:
         st.write("История пуста.")
